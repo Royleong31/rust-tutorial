@@ -1,0 +1,15 @@
+[package]
+name = "orderbook-cli"
+version = "0.1.0"
+edition = "2024"
+description = "Runs the order book: a scripted demo, an interactive prompt, or a CSV file of orders."
+
+# The package is called orderbook-cli, but the program it builds is `orderbook`.
+[[bin]]
+name = "orderbook"
+path = "src/main.rs"
+
+[dependencies]
+orderbook = { path = "../core" } # the library crate next door, by path
+csv = "1"                                          # reads CSV files
+serde = { version = "1", features = ["derive"] }   # turns CSV rows into structs

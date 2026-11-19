@@ -1,0 +1,9 @@
+[package]
+name = "orderbook"
+version = "0.1.0"
+edition = "2024"
+description = "A limit order book and matching engine for one instrument. Pure logic: no I/O, no threads."
+
+# No dependencies, on purpose. The core only needs the standard library, so
+# it builds fast and nothing outside can change how matching behaves.
+[dependencies]

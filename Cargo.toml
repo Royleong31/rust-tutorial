@@ -1,0 +1,28 @@
+[package]
+name = "rust_lab"
+version = "0.1.0"
+edition = "2024"
+
+# Each lesson is a standalone binary under src/bin/.
+#   cargo run  --bin p01_basics      -> run the lesson walkthrough
+#   cargo test --bin p01_basics      -> check your exercise solutions
+# Cargo discovers src/bin/*.rs automatically, so no [[bin]] entries are needed.
+#
+# Phases 1–10 only use the standard library. Phase 11 uses Tokio, which cargo
+# downloads from crates.io on the first build.
+
+# This directory is also a WORKSPACE: several crates that share one
+# Cargo.lock and one target/ directory. The capstone lives in orderbook/ as
+# two crates, a library and the program that runs it.
+#   cargo test -p orderbook          the library's tests
+#   cargo run  -p orderbook-cli      the program (see orderbook/README.md)
+#   cargo test --workspace           everything
+[workspace]
+members = ["orderbook/core", "orderbook/cli", "blackjack/core", "blackjack/cli"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+
+# Only for tests: tokio's "test-util" lets async tests pause and fast-forward time.
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

@@ -1,0 +1,35 @@
+# The capstone's scripted demo, as a CSV file of orders.
+# Run it with:  cargo run -p orderbook-cli -- orderbook/data/demo.csv
+#
+# Columns: action, order_id (for cancel/amend), trader, side, qty, price, tif.
+# An empty price means a market order. An empty tif means gtc.
+action,order_id,trader,side,qty,price,tif
+# Build a book. #2 and #3 are both at 1005; #2 arrived first.
+new,,1,sell,5,1010,
+new,,2,sell,3,1005,
+new,,3,sell,4,1005,
+new,,4,buy,6,1000,
+new,,5,buy,2,995,
+# A crossing buy: takes #2 then #3 at 1005, and the 2 left over rest.
+new,,6,buy,9,1005,
+# IOC, FOK, post-only.
+new,,7,sell,10,1000,ioc
+new,,8,buy,100,1010,fok
+new,,8,buy,1,1010,post
+new,,8,buy,1,1000,post
+# Self-trade prevention: cancels t1's own ask #1.
+new,,1,buy,2,1010,
+# Amend down, amend up (refused), cancel, cancel again (refused).
+amend,5,,,1
+amend,5,,,9
+cancel,5
+cancel,5
+# Bad rows: zero qty, off tick, unknown side, qty that isn't a number.
+new,,9,buy,0,1000,
+new,,9,buy,1,1003,
+new,,9,hold,1,1000,
+new,,9,buy,lots,1000,
+# Fresh asks, then a market buy for 7.
+new,,2,sell,4,1015,
+new,,3,sell,6,1020,
+new,,9,buy,7,,

@@ -20,7 +20,7 @@ pub enum Outcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
     Active,
-    Ended { total_bet_amount: i64, total_payout: i64}
+    Ended { total_bet_amount: u64, total_payout: u64}
 }
 
 pub struct BlackjackGameState {
@@ -46,36 +46,40 @@ impl BlackjackGameState {
                         self.dealer_hand.play(&mut self.rng);
                     }
                     
-                    let total_bet_amount = self.player_hand.bet_amount;
-
-                    self.player_hand.update_result(&self.player_hand);
-                    let total_payout_amount = self.player_hand.get_payout_amount();
-
-
-                    let total_payout = 
-                    self.phase = GamePhase::Ended {total_bet_amount: total_bet_amount: };
+                    self.end_game();
                 }
             }
 
             PlayerAction::Stand => {
                 self.dealer_hand.play(&mut self.rng);
-                self.phase = GamePhase::Ended;
+                self.end_game();
             }
         }
     }
 
-    pub fn new(seed: String, bet_amount: i64) -> BlackjackGameState {
+    fn end_game(&mut self) {
+        self.player_hand.update_result(&self.dealer_hand);
+        self.phase = GamePhase::Ended {total_bet_amount: self.player_hand.bet_amount, total_payout: self.player_hand.get_payout_amount() };
+    }
+
+    pub fn new(seed: String, bet_amount: u64) -> BlackjackGameState {
         let mut rng = Rng::new(seed, MIN_CARD_RNG_VALUE, MAX_CARD_RNG_VALUE);
         let player_card_0 = Card::draw(&mut rng);
         let player_card_1 = Card::draw(&mut rng);
         let dealer_card_0 = Card::draw(&mut rng);
         let dealer_card_1 = Card::draw(&mut rng);
 
-        BlackjackGameState {
+        let mut bj_state = BlackjackGameState {
             player_hand: PlayerHand::new(player_card_0, player_card_1, bet_amount),
             dealer_hand: DealerHand::new(dealer_card_0, dealer_card_1),
             rng: rng,
             phase: GamePhase::Active,
+        };
+
+        if bj_state.dealer_hand.is_blackjack() || bj_state.player_hand.is_blackjack() {
+            bj_state.end_game();
         }
+
+        bj_state
     }
 }

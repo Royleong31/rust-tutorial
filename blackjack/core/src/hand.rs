@@ -1,4 +1,5 @@
 use crate::card::{Card, Rank};
+use crate::hand::HandStatus::IN_PROGRESS;
 use crate::rng::Rng;
 
 pub struct Hand {
@@ -41,9 +42,19 @@ impl Hand {
     }
 }
 
+pub enum Outcome {
+    PLAYER_BLACKJACK, DEALER_BLACKJACK, WON, PUSH, LOST
+}
+
+pub enum HandStatus {
+    IN_PROGRESS,
+    ENDED { outcome: Outcome, payout: u64 }
+}
+
 pub struct PlayerHand {
-    pub bet_amount: i64,
+    pub bet_amount: u64,
     hand: Hand,
+    pub hand_status: HandStatus
 }
 
 impl PlayerHand {
@@ -57,6 +68,14 @@ impl PlayerHand {
 
     pub fn hand(&self) -> &Hand {
         &self.hand
+    }
+
+    pub fn is_bust(&self) -> bool {
+        self.hand.is_bust()
+    }
+
+    pub fn is_blackjack(&self) -> bool {
+        self.hand.is_blackjack()
     }
 
     // pub fn can_split(&self) -> bool {
@@ -82,7 +101,7 @@ impl PlayerHand {
         self.hand.draw(rng);
     }
 
-    pub fn new(card_0: Card, card_1: Card, bet_amount: i64) -> PlayerHand {
+    pub fn new(card_0: Card, card_1: Card, bet_amount: u64) -> PlayerHand {
         let mut player_cards: Vec<Card> = Vec::new();
         player_cards.push(card_0);
         player_cards.push(card_1);
@@ -92,6 +111,43 @@ impl PlayerHand {
             hand: Hand {
                 cards: player_cards,
             },
+            hand_status: IN_PROGRESS
+        }
+    }
+    
+    pub(crate) fn update_result(&mut self, dealer_hand: &DealerHand) {
+        let player_blackjack = self.is_blackjack();
+        let dealer_blackjack = dealer_hand.is_blackjack();
+
+        if player_blackjack && !dealer_blackjack {
+            self.hand_status = HandStatus::ENDED { outcome: Outcome::PLAYER_BLACKJACK, payout: self.bet_amount * 5 / 2 };
+            return;
+        }
+
+        if dealer_blackjack && !player_blackjack {
+            self.hand_status = HandStatus::ENDED { outcome: Outcome::DEALER_BLACKJACK, payout: 0 };
+            return;
+        }
+
+        let hand_lost = self.is_bust() || (!dealer_hand.is_bust() && dealer_hand.value() > self.value());
+
+        if hand_lost {
+            self.hand_status = HandStatus::ENDED { outcome: Outcome::LOST, payout: 0 };
+            return;
+        }
+
+        if dealer_hand.is_bust() || dealer_hand.value() < self.value() {
+            self.hand_status = HandStatus::ENDED { outcome: Outcome::WON, payout: self.bet_amount * 2 };
+            return;
+        }
+
+        self.hand_status = HandStatus::ENDED { outcome: Outcome::PUSH, payout: self.bet_amount }
+    }
+    
+    pub(crate) fn get_payout_amount(&self) -> u64 {
+        match self.hand_status {
+            HandStatus::ENDED { payout, .. } => payout,
+            HandStatus::IN_PROGRESS => panic!("get_payout_amount called before hand ended"),
         }
     }
 }
@@ -103,6 +159,10 @@ pub struct DealerHand {
 impl DealerHand {
     pub fn hand(&self) -> &Hand {
         &self.hand
+    }
+
+    pub fn is_blackjack(&self) -> bool {
+        self.hand.is_blackjack()
     }
 
     pub fn upcard(&self) -> &Card {
@@ -138,5 +198,14 @@ impl DealerHand {
                 cards: dealer_cards,
             },
         }
+    }
+
+    pub fn value(&self) -> u8 {
+        self.hand.value()
+    }
+
+
+    pub fn is_bust(&self) -> bool {
+        self.hand.is_bust()
     }
 }

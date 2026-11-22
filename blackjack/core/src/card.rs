@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::rng::Rng;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,4 +86,44 @@ impl Rank {
         Rank::Queen,
         Rank::King,
     ];
+}
+
+impl fmt::Display for Suit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let symbol = match self {
+            Suit::Diamonds => "♦",
+            Suit::Clubs => "♣",
+            Suit::Hearts => "♥",
+            Suit::Spades => "♠",
+        };
+        f.write_str(symbol)
+    }
+}
+
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Rank::Ace => "A",
+            Rank::Two => "2",
+            Rank::Three => "3",
+            Rank::Four => "4",
+            Rank::Five => "5",
+            Rank::Six => "6",
+            Rank::Seven => "7",
+            Rank::Eight => "8",
+            Rank::Nine => "9",
+            Rank::Ten => "10",
+            Rank::Jack => "J",
+            Rank::Queen => "Q",
+            Rank::King => "K",
+        };
+        f.write_str(label)
+    }
+}
+
+/// Prints like `A♠` or `10♥`.
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.rank, self.suit)
+    }
 }

@@ -214,3 +214,199 @@ impl DealerHand {
         self.hand.is_bust()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::card::Suit;
+
+    fn cards(ranks: &[Rank]) -> Vec<Card> {
+        ranks.iter().map(|&rank| Card { suit: Suit::Spades, rank }).collect()
+    }
+
+    fn hand(ranks: &[Rank]) -> Hand {
+        Hand { cards: cards(ranks) }
+    }
+
+    /// Built directly (not via `new`) so tests can start from any number of cards.
+    fn player(ranks: &[Rank], bet_amount: u64) -> PlayerHand {
+        PlayerHand { bet_amount, hand: hand(ranks), hand_status: HandStatus::InProgress }
+    }
+
+    fn dealer(ranks: &[Rank]) -> DealerHand {
+        DealerHand { hand: hand(ranks) }
+    }
+
+    fn settle(player_ranks: &[Rank], dealer_ranks: &[Rank], bet: u64) -> HandStatus {
+        let mut p = player(player_ranks, bet);
+        p.update_result(&dealer(dealer_ranks));
+        p.status()
+    }
+
+    fn ended(outcome: Outcome, payout: u64) -> HandStatus {
+        HandStatus::Ended { outcome, payout }
+    }
+
+    use Rank::*;
+
+    // ---------- Hand::value ----------
+
+    #[test]
+    fn value_hard_totals() {
+        assert_eq!(hand(&[Two, Three]).value(), 5);
+        assert_eq!(hand(&[Ten, Seven]).value(), 17);
+        assert_eq!(hand(&[King, Queen]).value(), 20);
+        assert_eq!(hand(&[Ten, Five, Nine]).value(), 24);
+    }
+
+    #[test]
+    fn value_soft_ace_counts_as_11() {
+        assert_eq!(hand(&[Ace, Six]).value(), 17);
+        assert_eq!(hand(&[Ace, King]).value(), 21);
+    }
+
+    #[test]
+    fn value_ace_drops_to_1_to_avoid_bust() {
+        assert_eq!(hand(&[Ace, Six, Ten]).value(), 17);
+        assert_eq!(hand(&[Ace, Nine, Five]).value(), 15);
+    }
+
+    #[test]
+    fn value_multiple_aces_only_one_counts_as_11() {
+        assert_eq!(hand(&[Ace, Ace]).value(), 12);
+        assert_eq!(hand(&[Ace, Ace, Nine]).value(), 21);
+        assert_eq!(hand(&[Ace, Ace, Ace, Ace]).value(), 14);
+        assert_eq!(hand(&[Ace, Ace, Ten]).value(), 12);
+    }
+
+    // ---------- blackjack / bust ----------
+
+    #[test]
+    fn blackjack_needs_exactly_two_cards() {
+        assert!(hand(&[Ace, King]).is_blackjack());
+        assert!(hand(&[Ten, Ace]).is_blackjack());
+        assert!(!hand(&[Ace, Five, Five]).is_blackjack(), "three-card 21 is not blackjack");
+        assert!(!hand(&[Ten, Queen]).is_blackjack());
+    }
+
+    #[test]
+    fn bust_is_over_21() {
+        assert!(hand(&[Ten, Five, Seven]).is_bust());
+        assert!(!hand(&[Ten, Five, Six]).is_bust());
+        assert!(!hand(&[Ace, Ten, Ten]).is_bust(), "ace drops to 1");
+    }
+
+    // ---------- PlayerHand::update_result ----------
+
+    #[test]
+    fn player_blackjack_pays_3_to_2() {
+        assert_eq!(settle(&[Ace, King], &[Ten, Queen], 10), ended(Outcome::PlayerBlackjack, 25));
+    }
+
+    #[test]
+    fn player_blackjack_odd_bet_rounds_down() {
+        assert_eq!(settle(&[Ace, King], &[Ten, Nine], 5), ended(Outcome::PlayerBlackjack, 12));
+    }
+
+    #[test]
+    fn player_blackjack_beats_dealer_three_card_21() {
+        assert_eq!(settle(&[Ace, King], &[Seven, Seven, Seven], 10), ended(Outcome::PlayerBlackjack, 25));
+    }
+
+    #[test]
+    fn both_blackjack_is_push() {
+        assert_eq!(settle(&[Ace, King], &[Queen, Ace], 10), ended(Outcome::Push, 10));
+    }
+
+    #[test]
+    fn dealer_blackjack_beats_player_20() {
+        assert_eq!(settle(&[Ten, Queen], &[Ace, King], 10), ended(Outcome::DealerBlackjack, 0));
+    }
+
+    #[test]
+    fn dealer_blackjack_beats_player_three_card_21() {
+        assert_eq!(settle(&[Seven, Seven, Seven], &[Ace, King], 10), ended(Outcome::DealerBlackjack, 0));
+    }
+
+    #[test]
+    fn player_bust_loses() {
+        assert_eq!(settle(&[Ten, Five, Nine], &[Ten, Seven], 10), ended(Outcome::Lost, 0));
+    }
+
+    #[test]
+    fn player_bust_loses_even_if_dealer_busts() {
+        assert_eq!(settle(&[Ten, Five, Nine], &[Ten, Six, Nine], 10), ended(Outcome::Lost, 0));
+    }
+
+    #[test]
+    fn dealer_bust_pays_1_to_1() {
+        assert_eq!(settle(&[Ten, Two], &[Ten, Six, Nine], 10), ended(Outcome::Won, 20));
+    }
+
+    #[test]
+    fn higher_total_wins() {
+        assert_eq!(settle(&[Ten, Nine], &[Ten, Seven], 10), ended(Outcome::Won, 20));
+    }
+
+    #[test]
+    fn lower_total_loses() {
+        assert_eq!(settle(&[Ten, Seven], &[Ten, Nine], 10), ended(Outcome::Lost, 0));
+    }
+
+    #[test]
+    fn equal_totals_push() {
+        assert_eq!(settle(&[Ten, Eight], &[Nine, Nine], 10), ended(Outcome::Push, 10));
+        assert_eq!(settle(&[Seven, Seven, Seven], &[Ten, Five, Six], 10), ended(Outcome::Push, 10));
+    }
+
+    #[test]
+    fn payout_amount_after_settling() {
+        let mut p = player(&[Ten, Nine], 10);
+        p.update_result(&dealer(&[Ten, Seven]));
+        assert_eq!(p.get_payout_amount(), 20);
+    }
+
+    #[test]
+    #[should_panic(expected = "before hand ended")]
+    fn payout_amount_before_settling_panics() {
+        player(&[Ten, Nine], 10).get_payout_amount();
+    }
+
+    // ---------- DealerHand ----------
+
+    #[test]
+    fn upcard_and_hole_card_order() {
+        let d = DealerHand::new(Card { suit: Suit::Hearts, rank: Nine }, Card { suit: Suit::Clubs, rank: Two });
+        assert_eq!(d.upcard().rank, Nine);
+        assert_eq!(d.hole_card().rank, Two);
+    }
+
+    #[test]
+    fn dealer_stands_on_hard_17() {
+        let mut d = dealer(&[Ten, Seven]);
+        d.play(&mut Rng::new("unused".to_string(), 0, 51));
+        assert_eq!(d.cards().len(), 2);
+    }
+
+    #[test]
+    fn dealer_stands_on_soft_17() {
+        let mut d = dealer(&[Ace, Six]);
+        d.play(&mut Rng::new("unused".to_string(), 0, 51));
+        assert_eq!(d.cards().len(), 2, "S17: dealer must not hit soft 17");
+    }
+
+    #[test]
+    fn dealer_draws_until_at_least_17() {
+        for i in 0..200 {
+            let mut d = dealer(&[Two, Three]);
+            d.play(&mut Rng::new(format!("dealer-{i}"), 0, 51));
+
+            assert!(d.value() >= 17, "seed dealer-{i}: stopped at {}", d.value());
+            assert!(d.cards().len() > 2);
+
+            // It stopped at the first total of 17+: one card fewer was still under 17.
+            let before_last = hand(&d.cards()[..d.cards().len() - 1].iter().map(|c| c.rank).collect::<Vec<_>>());
+            assert!(before_last.value() < 17, "seed dealer-{i}: drew past 17");
+        }
+    }
+}

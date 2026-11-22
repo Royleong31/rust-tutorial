@@ -127,3 +127,42 @@ impl fmt::Display for Card {
         write!(f, "{}{}", self.rank, self.suit)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rank_values() {
+        assert_eq!(Rank::Ace.value(), 1);
+        assert_eq!(Rank::Two.value(), 2);
+        assert_eq!(Rank::Nine.value(), 9);
+        for face in [Rank::Ten, Rank::Jack, Rank::Queen, Rank::King] {
+            assert_eq!(face.value(), 10, "{face:?}");
+        }
+    }
+
+    #[test]
+    fn display() {
+        let card = |rank, suit| Card { suit, rank };
+        assert_eq!(card(Rank::Ace, Suit::Spades).to_string(), "A♠");
+        assert_eq!(card(Rank::Ten, Suit::Hearts).to_string(), "10♥");
+        assert_eq!(card(Rank::King, Suit::Diamonds).to_string(), "K♦");
+        assert_eq!(card(Rank::Seven, Suit::Clubs).to_string(), "7♣");
+    }
+
+    #[test]
+    fn draw_covers_all_52_cards() {
+        let mut rng = Rng::new("card-coverage".to_string(), 0, 51);
+        let mut seen: Vec<Card> = Vec::new();
+
+        for _ in 0..2_000 {
+            let card = Card::draw(&mut rng);
+            if !seen.contains(&card) {
+                seen.push(card);
+            }
+        }
+
+        assert_eq!(seen.len(), 52);
+    }
+}

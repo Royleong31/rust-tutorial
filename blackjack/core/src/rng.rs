@@ -52,3 +52,48 @@ impl Rng {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn draws(seed: &str, n: usize) -> Vec<u64> {
+        let mut rng = Rng::new(seed.to_string(), 0, 51);
+        (0..n).map(|_| rng.get_random_number()).collect()
+    }
+
+    #[test]
+    fn same_seed_same_sequence() {
+        assert_eq!(draws("abc", 100), draws("abc", 100));
+    }
+
+    #[test]
+    fn different_seeds_differ() {
+        assert_ne!(draws("abc", 100), draws("abd", 100));
+    }
+
+    #[test]
+    fn stays_in_range_and_hits_both_ends() {
+        let mut rng = Rng::new("range".to_string(), 3, 7);
+        let values: Vec<u64> = (0..1_000).map(|_| rng.get_random_number()).collect();
+
+        assert!(values.iter().all(|v| (3..=7).contains(v)));
+        assert!(values.contains(&3), "min is inclusive");
+        assert!(values.contains(&7), "max is inclusive");
+    }
+
+    #[test]
+    #[should_panic]
+    fn min_must_be_below_max() {
+        Rng::new("x".to_string(), 5, 5);
+    }
+
+    #[test]
+    fn debug_hides_seed() {
+        let rng = Rng::new("super-secret-seed".to_string(), 0, 51);
+        let debug = format!("{rng:?}");
+
+        assert!(!debug.contains("super-secret-seed"), "{debug}");
+        assert!(debug.contains("counter"), "{debug}");
+    }
+}

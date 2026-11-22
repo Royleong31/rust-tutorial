@@ -1,5 +1,6 @@
 use sha2::{Digest, Sha256};
 
+#[derive(Debug)]
 pub struct Rng {
     seed: String,
     counter: u64,

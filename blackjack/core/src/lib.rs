@@ -3,17 +3,6 @@ mod hand;
 mod rng;
 mod state;
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use card::{Card, Rank, Suit};
+pub use hand::{DealerHand, HandStatus, Outcome, PlayerHand};
+pub use state::{BlackjackGameState, GamePhase, PlayerAction};

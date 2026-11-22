@@ -1,19 +1,22 @@
 use crate::card::{Card, Rank};
-use crate::hand::HandStatus::IN_PROGRESS;
 use crate::rng::Rng;
 
-pub struct Hand {
+#[derive(Debug)]
+pub(crate) struct Hand {
     cards: Vec<Card>,
 }
 
 impl Hand {
-    pub fn draw(&mut self, rng: &mut Rng) -> &Vec<Card> {
+    pub(crate) fn draw(&mut self, rng: &mut Rng) {
         let card = Card::draw(rng);
         self.cards.push(card);
-        return &self.cards;
     }
 
-    pub fn value(&self) -> u8 {
+    pub(crate) fn cards(&self) -> &[Card] {
+        &self.cards
+    }
+
+    pub(crate) fn value(&self) -> u8 {
         let mut hand_value = self
             .cards
             .iter()
@@ -27,47 +30,58 @@ impl Hand {
         hand_value
     }
 
-    pub fn is_blackjack(&self) -> bool {
+    pub(crate) fn is_blackjack(&self) -> bool {
         let hand_value = self.value();
 
         self.number_of_cards_in_hand() == 2 && hand_value == 21
     }
 
-    pub fn is_bust(&self) -> bool {
+    pub(crate) fn is_bust(&self) -> bool {
         self.value() > 21
     }
 
-    pub fn number_of_cards_in_hand(&self) -> usize {
-        self.cards.iter().len()
+    pub(crate) fn number_of_cards_in_hand(&self) -> usize {
+        self.cards.len()
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
-    PLAYER_BLACKJACK, DEALER_BLACKJACK, WON, PUSH, LOST
+    PlayerBlackjack,
+    DealerBlackjack,
+    Won,
+    Push,
+    Lost,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HandStatus {
-    IN_PROGRESS,
-    ENDED { outcome: Outcome, payout: u64 }
+    InProgress,
+    Ended { outcome: Outcome, payout: u64 },
 }
 
+#[derive(Debug)]
 pub struct PlayerHand {
-    pub bet_amount: u64,
+    bet_amount: u64,
     hand: Hand,
-    pub hand_status: HandStatus
+    hand_status: HandStatus,
 }
 
 impl PlayerHand {
     pub fn cards(&self) -> &[Card] {
-        &self.hand.cards
+        self.hand.cards()
     }
 
     // pub fn can_double(&self) -> bool {
     //     self.hand.number_of_cards_in_hand() == 2
     // }
 
-    pub fn hand(&self) -> &Hand {
-        &self.hand
+    pub fn bet_amount(&self) -> u64 {
+        self.bet_amount
+    }
+
+    pub fn status(&self) -> HandStatus {
+        self.hand_status
     }
 
     pub fn is_bust(&self) -> bool {
@@ -97,68 +111,66 @@ impl PlayerHand {
         self.hand.value()
     }
 
-    pub fn hit(&mut self, rng: &mut Rng) {
+    pub(crate) fn hit(&mut self, rng: &mut Rng) {
         self.hand.draw(rng);
     }
 
-    pub fn new(card_0: Card, card_1: Card, bet_amount: u64) -> PlayerHand {
-        let mut player_cards: Vec<Card> = Vec::new();
-        player_cards.push(card_0);
-        player_cards.push(card_1);
-
+    pub(crate) fn new(card_0: Card, card_1: Card, bet_amount: u64) -> PlayerHand {
         PlayerHand {
-            bet_amount: bet_amount,
+            bet_amount,
             hand: Hand {
-                cards: player_cards,
+                cards: vec![card_0, card_1],
             },
-            hand_status: IN_PROGRESS
+            hand_status: HandStatus::InProgress,
         }
     }
-    
+
     pub(crate) fn update_result(&mut self, dealer_hand: &DealerHand) {
         let player_blackjack = self.is_blackjack();
         let dealer_blackjack = dealer_hand.is_blackjack();
 
         if player_blackjack && !dealer_blackjack {
-            self.hand_status = HandStatus::ENDED { outcome: Outcome::PLAYER_BLACKJACK, payout: self.bet_amount * 5 / 2 };
+            // 3:2 payout. Integer division rounds odd bets down (bet 5 pays 12).
+            self.hand_status = HandStatus::Ended { outcome: Outcome::PlayerBlackjack, payout: self.bet_amount * 5 / 2 };
             return;
         }
 
         if dealer_blackjack && !player_blackjack {
-            self.hand_status = HandStatus::ENDED { outcome: Outcome::DEALER_BLACKJACK, payout: 0 };
+            self.hand_status = HandStatus::Ended { outcome: Outcome::DealerBlackjack, payout: 0 };
             return;
         }
 
         let hand_lost = self.is_bust() || (!dealer_hand.is_bust() && dealer_hand.value() > self.value());
 
         if hand_lost {
-            self.hand_status = HandStatus::ENDED { outcome: Outcome::LOST, payout: 0 };
+            self.hand_status = HandStatus::Ended { outcome: Outcome::Lost, payout: 0 };
             return;
         }
 
         if dealer_hand.is_bust() || dealer_hand.value() < self.value() {
-            self.hand_status = HandStatus::ENDED { outcome: Outcome::WON, payout: self.bet_amount * 2 };
+            self.hand_status = HandStatus::Ended { outcome: Outcome::Won, payout: self.bet_amount * 2 };
             return;
         }
 
-        self.hand_status = HandStatus::ENDED { outcome: Outcome::PUSH, payout: self.bet_amount }
+        self.hand_status = HandStatus::Ended { outcome: Outcome::Push, payout: self.bet_amount }
     }
-    
+
     pub(crate) fn get_payout_amount(&self) -> u64 {
         match self.hand_status {
-            HandStatus::ENDED { payout, .. } => payout,
-            HandStatus::IN_PROGRESS => panic!("get_payout_amount called before hand ended"),
+            HandStatus::Ended { payout, .. } => payout,
+            HandStatus::InProgress => panic!("get_payout_amount called before hand ended"),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct DealerHand {
     hand: Hand,
 }
 
 impl DealerHand {
-    pub fn hand(&self) -> &Hand {
-        &self.hand
+    pub fn cards(&self) -> &[Card] {
+        self.hand.cards()
     }
 
     pub fn is_blackjack(&self) -> bool {
@@ -179,23 +191,17 @@ impl DealerHand {
             .expect("dealer hand always has 2 cards")
     }
 
-    pub fn play(&mut self, rng: &mut Rng) -> &[Card] {
+    pub(crate) fn play(&mut self, rng: &mut Rng) {
         // Dealer draws until 17 or more, and stands on soft 17 (S17 rule).
         while self.hand.value() < 17 {
             self.hand.draw(rng);
         }
-
-        &self.hand.cards
     }
 
-    pub fn new(up_card: Card, hole_card: Card) -> DealerHand {
-        let mut dealer_cards: Vec<Card> = Vec::new();
-        dealer_cards.push(up_card);
-        dealer_cards.push(hole_card);
-
+    pub(crate) fn new(up_card: Card, hole_card: Card) -> DealerHand {
         DealerHand {
             hand: Hand {
-                cards: dealer_cards,
+                cards: vec![up_card, hole_card],
             },
         }
     }
@@ -203,7 +209,6 @@ impl DealerHand {
     pub fn value(&self) -> u8 {
         self.hand.value()
     }
-
 
     pub fn is_bust(&self) -> bool {
         self.hand.is_bust()

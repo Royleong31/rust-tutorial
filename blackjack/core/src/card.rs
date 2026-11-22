@@ -1,5 +1,6 @@
 use crate::rng::Rng;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Card {
     pub suit: Suit,
     pub rank: Rank,

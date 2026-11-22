@@ -1,4 +1,5 @@
 mod card;
+mod deck;
 mod hand;
 mod rng;
 mod state;

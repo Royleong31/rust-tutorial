@@ -1,5 +1,5 @@
 use crate::card::{Card, Rank};
-use crate::rng::Rng;
+use crate::deck::CardSource;
 
 #[derive(Debug)]
 pub(crate) struct Hand {
@@ -7,9 +7,8 @@ pub(crate) struct Hand {
 }
 
 impl Hand {
-    pub(crate) fn draw(&mut self, rng: &mut Rng) {
-        let card = Card::draw(rng);
-        self.cards.push(card);
+    pub(crate) fn draw(&mut self, deck: &mut dyn CardSource) {
+        self.cards.push(deck.draw());
     }
 
     pub(crate) fn cards(&self) -> &[Card] {
@@ -111,8 +110,8 @@ impl PlayerHand {
         self.hand.value()
     }
 
-    pub(crate) fn hit(&mut self, rng: &mut Rng) {
-        self.hand.draw(rng);
+    pub(crate) fn hit(&mut self, deck: &mut dyn CardSource) {
+        self.hand.draw(deck);
     }
 
     pub(crate) fn new(card_0: Card, card_1: Card, bet_amount: u64) -> PlayerHand {
@@ -191,10 +190,10 @@ impl DealerHand {
             .expect("dealer hand always has 2 cards")
     }
 
-    pub(crate) fn play(&mut self, rng: &mut Rng) {
+    pub(crate) fn play(&mut self, deck: &mut dyn CardSource) {
         // Dealer draws until 17 or more, and stands on soft 17 (S17 rule).
         while self.hand.value() < 17 {
-            self.hand.draw(rng);
+            self.hand.draw(deck);
         }
     }
 
@@ -219,6 +218,7 @@ impl DealerHand {
 mod tests {
     use super::*;
     use crate::card::Suit;
+    use crate::deck::ScriptedDeck;
 
     fn cards(ranks: &[Rank]) -> Vec<Card> {
         ranks.iter().map(|&rank| Card { suit: Suit::Spades, rank }).collect()
@@ -384,29 +384,48 @@ mod tests {
     #[test]
     fn dealer_stands_on_hard_17() {
         let mut d = dealer(&[Ten, Seven]);
-        d.play(&mut Rng::new("unused".to_string(), 0, 51));
+        d.play(&mut ScriptedDeck::of(&[])); // an empty deck panics if the dealer draws
         assert_eq!(d.cards().len(), 2);
     }
 
     #[test]
     fn dealer_stands_on_soft_17() {
         let mut d = dealer(&[Ace, Six]);
-        d.play(&mut Rng::new("unused".to_string(), 0, 51));
-        assert_eq!(d.cards().len(), 2, "S17: dealer must not hit soft 17");
+        d.play(&mut ScriptedDeck::of(&[])); // S17: hitting soft 17 would panic here
+        assert_eq!(d.value(), 17);
     }
 
     #[test]
-    fn dealer_draws_until_at_least_17() {
-        for i in 0..200 {
-            let mut d = dealer(&[Two, Three]);
-            d.play(&mut Rng::new(format!("dealer-{i}"), 0, 51));
+    fn dealer_draws_until_17_then_stops() {
+        let mut d = dealer(&[Two, Three]);
+        let mut deck = ScriptedDeck::of(&[Four, Five, Three, King]);
+        d.play(&mut deck);
 
-            assert!(d.value() >= 17, "seed dealer-{i}: stopped at {}", d.value());
-            assert!(d.cards().len() > 2);
+        // 5 → 9 → 14 → 17, stop. The King is never drawn.
+        assert_eq!(d.value(), 17);
+        assert_eq!(d.cards().len(), 5);
+        assert_eq!(deck.remaining(), 1);
+    }
 
-            // It stopped at the first total of 17+: one card fewer was still under 17.
-            let before_last = hand(&d.cards()[..d.cards().len() - 1].iter().map(|c| c.rank).collect::<Vec<_>>());
-            assert!(before_last.value() < 17, "seed dealer-{i}: drew past 17");
-        }
+    #[test]
+    fn dealer_counts_drawn_ace_as_11_when_it_fits() {
+        let mut d = dealer(&[Two, Four]);
+        d.play(&mut ScriptedDeck::of(&[Ace])); // 6 + 11 = soft 17 → stand
+        assert_eq!(d.value(), 17);
+    }
+
+    #[test]
+    fn dealer_can_bust() {
+        let mut d = dealer(&[Ten, Six]);
+        d.play(&mut ScriptedDeck::of(&[Nine]));
+        assert!(d.is_bust());
+    }
+
+    #[test]
+    fn hit_adds_one_card() {
+        let mut p = player(&[Two, Three], 10);
+        p.hit(&mut ScriptedDeck::of(&[Nine]));
+        assert_eq!(p.cards().len(), 3);
+        assert_eq!(p.value(), 14);
     }
 }

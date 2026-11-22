@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 blackjack = { version = "0.1.0", path = "../core" }
+getrandom = "0.4.3"

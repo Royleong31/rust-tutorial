@@ -1,11 +1,23 @@
+use std::fmt;
+
 use sha2::{Digest, Sha256};
 
-#[derive(Debug)]
 pub struct Rng {
     seed: String,
     counter: u64,
     min: u64,
     max: u64,
+}
+
+// Hand-written so the seed is never printed: seed + counter predicts every future card.
+impl fmt::Debug for Rng {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Rng")
+            .field("counter", &self.counter)
+            .field("min", &self.min)
+            .field("max", &self.max)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Rng {

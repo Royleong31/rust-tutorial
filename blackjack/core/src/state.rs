@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::card::Card;
 use crate::hand::{DealerHand, PlayerHand};
 use crate::rng::Rng;
@@ -19,12 +21,29 @@ pub enum GamePhase {
     Ended { total_bet_amount: u64, total_payout: u64 },
 }
 
-#[derive(Debug)]
 pub struct BlackjackGameState {
     player_hand: PlayerHand,
     dealer_hand: DealerHand,
     rng: Rng,
     phase: GamePhase,
+}
+
+// Hand-written so `{:?}` follows the same visibility rules as the public API:
+// only the dealer's upcard is shown while the game is active.
+impl fmt::Debug for BlackjackGameState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("BlackjackGameState");
+        s.field("player_hand", &self.player_hand);
+
+        match self.dealer_hand() {
+            Some(dealer_hand) => s.field("dealer_hand", dealer_hand),
+            None => s.field("dealer_upcard", self.dealer_upcard()),
+        };
+
+        s.field("rng", &self.rng)
+            .field("phase", &self.phase)
+            .finish()
+    }
 }
 
 impl BlackjackGameState {

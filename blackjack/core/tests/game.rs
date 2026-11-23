@@ -1,7 +1,7 @@
 //! Integration tests: these use only the public API, the same way the CLI does.
 //! The detailed rules are covered by the unit tests inside src/.
 
-use blackjack::{BlackjackGameState, GamePhase, HandStatus, Outcome, PlayerAction};
+use blackjack::{BlackjackGameState, GamePhase, HandLike, HandStatus, Outcome, PlayerAction};
 
 const BET: u64 = 10;
 

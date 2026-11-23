@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::process;
 
-use blackjack::{BlackjackGameState, Card, HandStatus, Outcome, PlayerAction};
+use blackjack::{BlackjackGameState, Card, HandLike, HandStatus, Outcome, PlayerAction};
 
 const DEFAULT_BALANCE: u64 = 1000;
 
@@ -162,12 +162,15 @@ fn render(game: &BlackjackGameState) {
 
     match game.dealer_hand() {
         None => println!("  Dealer:  {}  ??", game.dealer_upcard()),
-        Some(dealer) => println!("  Dealer:  {}   ({})", hand_str(dealer.cards()), dealer.value()),
+        Some(dealer) => print_hand("Dealer:", dealer),
     }
 
-    let player = game.player_hand();
-    println!("  You:     {}   ({})", hand_str(player.cards()), player.value());
+    print_hand("You:", game.player_hand());
     println!();
+}
+
+fn print_hand(label: &str, hand: &impl HandLike) {
+    println!("  {label:<8} {}   ({})", hand_str(hand.cards()), hand.value());
 }
 
 /// Prints the outcome and returns the payout to credit back to the balance.

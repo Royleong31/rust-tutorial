@@ -1,8 +1,9 @@
 use crate::card::{Card, Rank};
 use crate::deck::CardSource;
 
+/// The cards in a hand and the blackjack rules that apply to any hand.
 #[derive(Debug)]
-pub(crate) struct Hand {
+pub struct Hand {
     cards: Vec<Card>,
 }
 
@@ -11,11 +12,11 @@ impl Hand {
         self.cards.push(deck.draw());
     }
 
-    pub(crate) fn cards(&self) -> &[Card] {
+    pub fn cards(&self) -> &[Card] {
         &self.cards
     }
 
-    pub(crate) fn value(&self) -> u8 {
+    pub fn value(&self) -> u8 {
         let mut hand_value = self
             .cards
             .iter()
@@ -29,18 +30,42 @@ impl Hand {
         hand_value
     }
 
-    pub(crate) fn is_blackjack(&self) -> bool {
+    pub fn is_blackjack(&self) -> bool {
         let hand_value = self.value();
 
         self.number_of_cards_in_hand() == 2 && hand_value == 21
     }
 
-    pub(crate) fn is_bust(&self) -> bool {
+    pub fn is_bust(&self) -> bool {
         self.value() > 21
     }
 
     pub(crate) fn number_of_cards_in_hand(&self) -> usize {
         self.cards.len()
+    }
+}
+
+/// Read-only behaviour shared by every kind of hand.
+///
+/// Implementors only provide `hand()`; the other methods come for free and
+/// can be overridden if a hand type needs different rules.
+pub trait HandLike {
+    fn hand(&self) -> &Hand;
+
+    fn cards(&self) -> &[Card] {
+        self.hand().cards()
+    }
+
+    fn value(&self) -> u8 {
+        self.hand().value()
+    }
+
+    fn is_bust(&self) -> bool {
+        self.hand().is_bust()
+    }
+
+    fn is_blackjack(&self) -> bool {
+        self.hand().is_blackjack()
     }
 }
 
@@ -66,11 +91,13 @@ pub struct PlayerHand {
     hand_status: HandStatus,
 }
 
-impl PlayerHand {
-    pub fn cards(&self) -> &[Card] {
-        self.hand.cards()
+impl HandLike for PlayerHand {
+    fn hand(&self) -> &Hand {
+        &self.hand
     }
+}
 
+impl PlayerHand {
     // pub fn can_double(&self) -> bool {
     //     self.hand.number_of_cards_in_hand() == 2
     // }
@@ -81,14 +108,6 @@ impl PlayerHand {
 
     pub fn status(&self) -> HandStatus {
         self.hand_status
-    }
-
-    pub fn is_bust(&self) -> bool {
-        self.hand.is_bust()
-    }
-
-    pub fn is_blackjack(&self) -> bool {
-        self.hand.is_blackjack()
     }
 
     // pub fn can_split(&self) -> bool {
@@ -105,10 +124,6 @@ impl PlayerHand {
 
     //     self.hand.number_of_cards_in_hand() == 2 && first_card.rank == second_card.rank
     // }
-
-    pub fn value(&self) -> u8 {
-        self.hand.value()
-    }
 
     pub(crate) fn hit(&mut self, deck: &mut dyn CardSource) {
         self.hand.draw(deck);
@@ -167,25 +182,21 @@ pub struct DealerHand {
     hand: Hand,
 }
 
+impl HandLike for DealerHand {
+    fn hand(&self) -> &Hand {
+        &self.hand
+    }
+}
+
 impl DealerHand {
-    pub fn cards(&self) -> &[Card] {
-        self.hand.cards()
-    }
-
-    pub fn is_blackjack(&self) -> bool {
-        self.hand.is_blackjack()
-    }
-
     pub fn upcard(&self) -> &Card {
-        self.hand
-            .cards
-            .get(0)
+        self.cards()
+            .first()
             .expect("dealer hand always has 2 cards")
     }
 
     pub fn hole_card(&self) -> &Card {
-        self.hand
-            .cards
+        self.cards()
             .get(1)
             .expect("dealer hand always has 2 cards")
     }
@@ -203,14 +214,6 @@ impl DealerHand {
                 cards: vec![up_card, hole_card],
             },
         }
-    }
-
-    pub fn value(&self) -> u8 {
-        self.hand.value()
-    }
-
-    pub fn is_bust(&self) -> bool {
-        self.hand.is_bust()
     }
 }
 

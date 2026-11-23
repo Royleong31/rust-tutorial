@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::card::Card;
 use crate::deck::{CardSource, SeededDeck};
-use crate::hand::{DealerHand, PlayerHand};
+use crate::hand::{DealerHand, HandLike, PlayerHand};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerAction {
